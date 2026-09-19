@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sanctum Sanctorum — Members' Bookstore</title>
+  <meta name="description" content="Members' bookstore and lending library.">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="wordmark" href="#catalog" aria-label="Sanctum Sanctorum — Members' Bookstore, go to catalog">
+        <span class="wordmark-mark" aria-hidden="true">SS</span>
+        <span class="wordmark-text">
+          <span class="wordmark-name">Sanctum Sanctorum</span>
+          <span class="wordmark-sub">Members' Bookstore</span>
+        </span>
+      </a>
+      <div class="header-meta">
+        <span id="api-status" class="api-status" data-state="unknown"><span class="dot" aria-hidden="true"></span><span class="label">Checking API…</span></span>
+        <button id="header-member" class="chip" type="button" data-action="goto" data-tab="members">Sign in as member</button>
+        <button id="header-cart" class="chip chip-accent" type="button" data-action="goto" data-tab="cart">
+          Cart <span id="cart-count" class="count" aria-label="items">0</span>
+        </button>
+      </div>
+    </div>
+    <div class="container">
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button type="button" role="tab" id="tab-catalog" aria-controls="panel-catalog" data-tab="catalog">Catalog</button>
+        <button type="button" role="tab" id="tab-members" aria-controls="panel-members" data-tab="members">Members</button>
+        <button type="button" role="tab" id="tab-cart" aria-controls="panel-cart" data-tab="cart">Cart &amp; Orders</button>
+        <button type="button" role="tab" id="tab-loans" aria-controls="panel-loans" data-tab="loans">Loans</button>
+        <button type="button" role="tab" id="tab-reports" aria-controls="panel-reports" data-tab="reports">Reports</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="container main">
+    <!-- ============================ CATALOG ============================ -->
+    <section id="panel-catalog" role="tabpanel" aria-labelledby="tab-catalog" tabindex="-1" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Catalog</h1>
+          <p class="muted">Browse the collection, add to cart or borrow as the selected member.</p>
+        </div>
+        <button id="toggle-add-book" type="button" class="btn btn-secondary" aria-expanded="false" aria-controls="add-book-card">Add book</button>
+      </div>
+
+      <div id="add-book-card" class="card" hidden>
+        <h2 class="card-title">Add a book</h2>
+        <form id="add-book-form" novalidate>
+          <div class="form-errors notice notice-error" role="alert" hidden></div>
+          <div class="form-grid">
+            <div class="field field-wide">
+              <label for="nb-title">Title</label>
+              <input id="nb-title" name="title" type="text" maxlength="250" required autocomplete="off">
+            </div>
+            <div class="field field-wide">
+              <label for="nb-author">Author</label>
+              <input id="nb-author" name="author" type="text" maxlength="250" required autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="nb-isbn">ISBN-13</label>
+              <input id="nb-isbn" name="isbn" type="text" inputmode="numeric" placeholder="978-0-00-000000-0" required autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="nb-price">Price (USD)</label>
+              <input id="nb-price" name="price_cents" type="text" inputmode="decimal" placeholder="12.99" required>
+            </div>
+            <div class="field">
+              <label for="nb-stock">Stock</label>
+              <input id="nb-stock" name="stock" type="number" step="1" value="1" required>
+            </div>
+            <div class="field field-check">
+              <input id="nb-restricted" name="restricted" type="checkbox">
+              <label for="nb-restricted">Restricted <span class="muted">(Master tier and above)</span></label>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Create book</button>
+            <button type="button" class="btn btn-ghost" data-action="close-add-book">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <form id="catalog-filters" class="card filters" role="search" aria-label="Filter books">
+        <div class="field field-search">
+          <label for="f-q">Search</label>
+          <input id="f-q" name="q" type="search" placeholder="Title or author" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-restricted">Access</label>
+          <select id="f-restricted" name="restricted">
+            <option value="">All books</option>
+            <option value="false">Unrestricted only</option>
+            <option value="true">Restricted only</option>
+          </select>
+        </div>
+        <div class="field field-narrow">
+          <label for="f-min">Min price ($)</label>
+          <input id="f-min" name="min_price" type="text" inputmode="decimal" placeholder="0.00">
+        </div>
+        <div class="field field-narrow">
+          <label for="f-max">Max price ($)</label>
+          <input id="f-max" name="max_price" type="text" inputmode="decimal" placeholder="Any">
+        </div>
+        <div class="field">
+          <label for="f-sort">Sort by</label>
+          <select id="f-sort" name="sort">
+            <option value="">Default</option>
+            <option value="title">Title (A–Z)</option>
+            <option value="-title">Title (Z–A)</option>
+            <option value="price">Price (low to high)</option>
+            <option value="-price">Price (high to low)</option>
+          </select>
+        </div>
+        <div class="field field-narrow">
+          <label for="f-limit">Per page</label>
+          <select id="f-limit" name="limit">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <div class="filters-actions">
+          <button type="reset" class="btn btn-ghost">Clear</button>
+        </div>
+      </form>
+
+      <div class="card card-flush">
+        <div class="table-wrap">
+          <table id="books-table" class="table">
+            <caption class="sr-only">Books</caption>
+            <thead>
+              <tr>
+                <th scope="col">Title</th>
+                <th scope="col">Author</th>
+                <th scope="col">ISBN</th>
+                <th scope="col" class="num">Price</th>
+                <th scope="col" class="num">Stock</th>
+                <th scope="col" class="actions-col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="books-body">
+              <tr><td colspan="6" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" aria-label="Pagination">
+          <p id="page-info" class="muted" aria-live="polite"></p>
+          <div class="btn-group">
+            <button type="button" class="btn btn-secondary btn-sm" data-action="page-prev" disabled>Previous</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-action="page-next" disabled>Next</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ MEMBERS ============================ -->
+    <section id="panel-members" role="tabpanel" aria-labelledby="tab-members" tabindex="-1" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Members</h1>
+          <p class="muted">Choose who you are acting as. Actions in the catalog, cart and loans use this member.</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div id="member-card" class="card"></div>
+
+        <div class="stack">
+          <div class="card">
+            <h2 class="card-title">Sign in by member ID</h2>
+            <form id="signin-form" novalidate>
+              <div class="form-errors notice notice-error" role="alert" hidden></div>
+              <div class="inline-form">
+                <div class="field">
+                  <label for="si-id">Member ID</label>
+                  <input id="si-id" name="member_id" type="number" min="1" step="1" inputmode="numeric" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Sign in</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Create member</h2>
+            <form id="create-member-form" novalidate>
+              <div class="form-errors notice notice-error" role="alert" hidden></div>
+              <div class="form-grid">
+                <div class="field field-wide">
+                  <label for="nm-name">Name</label>
+                  <input id="nm-name" name="name" type="text" maxlength="120" required autocomplete="name">
+                </div>
+                <div class="field field-wide">
+                  <label for="nm-email">Email</label>
+                  <input id="nm-email" name="email" type="email" required autocomplete="email">
+                </div>
+                <div class="field">
+                  <label for="nm-tier">Tier</label>
+                  <select id="nm-tier" name="tier">
+                    <option value="apprentice">Apprentice</option>
+                    <option value="adept">Adept</option>
+                    <option value="master">Master</option>
+                    <option value="supreme">Supreme</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create and sign in</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= CART & ORDERS ========================= -->
+    <section id="panel-cart" role="tabpanel" aria-labelledby="tab-cart" tabindex="-1" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Cart &amp; Orders</h1>
+          <p class="muted">Review your cart, check out, and manage orders for the selected member.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Cart</h2>
+        <div id="cart-body"></div>
+      </div>
+
+      <div id="order-detail" class="card" hidden aria-live="polite"></div>
+
+      <div class="card card-flush">
+        <div class="card-head">
+          <h2 class="card-title">Orders</h2>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="refresh-orders">Refresh</button>
+        </div>
+        <div id="orders-body"></div>
+      </div>
+    </section>
+
+    <!-- ============================= LOANS ============================= -->
+    <section id="panel-loans" role="tabpanel" aria-labelledby="tab-loans" tabindex="-1" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Loans</h1>
+          <p class="muted">Books borrowed by the selected member. Loans are due 14 days after borrowing.</p>
+        </div>
+      </div>
+
+      <div class="card card-flush">
+        <div class="card-head">
+          <div class="field field-inline">
+            <label for="loan-status">Status</label>
+            <select id="loan-status">
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="overdue">Overdue</option>
+              <option value="returned">Returned</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="refresh-loans">Refresh</button>
+        </div>
+        <div id="loans-body"></div>
+      </div>
+    </section>
+
+    <!-- ============================ REPORTS ============================ -->
+    <section id="panel-reports" role="tabpanel" aria-labelledby="tab-reports" tabindex="-1" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Reports</h1>
+          <p class="muted">Best-selling books across paid orders.</p>
+        </div>
+      </div>
+
+      <div class="card card-flush">
+        <div class="card-head">
+          <h2 class="card-title">Top books</h2>
+          <div class="card-head-tools">
+            <div class="field field-inline">
+              <label for="report-limit">Show</label>
+              <select id="report-limit">
+                <option value="5" selected>Top 5</option>
+                <option value="10">Top 10</option>
+                <option value="25">Top 25</option>
+                <option value="50">Top 50</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="refresh-reports">Refresh</button>
+          </div>
+        </div>
+        <div id="reports-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container muted">Sanctum Sanctorum · Members' Bookstore &amp; Lending Library</div>
+  </footer>
+
+  <div id="toasts" class="toasts" aria-live="polite" aria-relevant="additions"></div>
+</body>
+</html>

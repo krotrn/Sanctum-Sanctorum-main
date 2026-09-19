@@ -1,0 +1,24 @@
+[project]
+name = "sanctum-sanctorum"
+version = "0.1.0"
+description = "The Sanctum Sanctorum Clubhouse Bookstore - backend intern take-home"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110,<1.0",
+    "uvicorn[standard]>=0.29",
+    "sqlalchemy>=2.0,<3.0",
+    "pydantic>=2.6,<3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.uv]
+package = false
