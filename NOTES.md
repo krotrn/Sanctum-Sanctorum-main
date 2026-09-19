@@ -29,15 +29,23 @@ members (validation, duplicates, stats), orders (pricing, discounts, stock
 reservation, status changes), loans (borrowing rules, returns, late fees) and the
 top-books report.
 
+Both optional extras are also implemented:
+
+- **Concurrency-safe stock reservation.** Orders for the last copy of a book are
+  now safe under parallel requests — see *Order stock concurrency* below.
+- **`GET /members` with pagination.** `limit` (1–100, default 20) and `offset`
+  (≥0), returning `{items, total, limit, offset}` ordered by id, mirroring the
+  shape `GET /books` already uses.
+
 ## What is not done
 
 - **No migration to hosted Postgres.** The deployment runs SQLite on the
   container's local disk. See *Deployment* below for the reasoning and the
   limitation this carries.
-- **None of the optional extras.** No concurrency-safe handling of the last copy
-  of a book (the trade-off is analysed under *Order stock concurrency*), no
-  `GET /members` endpoint with pagination, and no additional tests beyond the
-  supplied suite.
+- **No additional tests** beyond the supplied suite. The concurrency work below
+  was verified with a throwaway stress script rather than a committed test,
+  because a reliable concurrency test needs threads and a file-backed database,
+  which would not fit the existing fixtures.
 - **`create_loan` loads all of a member's loans** to count active ones and check
   for overdue ones, rather than filtering in SQL. Correct and readable at this
   scale; it would need a query-side filter if members accumulated many loans.
@@ -118,11 +126,16 @@ also keeps the email index directly usable.
 
 ### Order stock concurrency
 
-The validate-then-mutate flow is safe for sequential requests but is not fully
-concurrency-safe. Two simultaneous orders can both read the same available stock
-before either transaction commits, allowing both to reserve the same copies.
+Validate-then-mutate alone is not concurrency-safe. Two simultaneous orders can
+both read the same available stock before either transaction commits, and both
+then write a decrement based on a value that is already stale — a lost update.
 
-A production implementation should make the stock decrement atomic:
+I measured this rather than assuming it. With a plain `book.stock -= quantity`,
+24 threads ordering the last copy of a one-copy book produced **12 successful
+orders**. Final stock read 0, so the row looked correct while twelve customers
+had been sold the same book.
+
+`reserve_stock` now performs the decrement as a single conditional statement:
 
 ```sql
 UPDATE books
@@ -130,11 +143,19 @@ SET stock = stock - :q
 WHERE id = :id AND stock >= :q
 ```
 
-and verify that exactly one row was updated, or use `SELECT ... FOR UPDATE` to
-lock the book row across validation and mutation.
+The guard lives inside the UPDATE, so the database evaluates it while holding the
+row's write lock. A caller that matches no rows lost the race and gets a 409. The
+same 24-thread test now yields exactly one order and a final stock of 0.
 
-I left the readable version in place and documented the gap rather than adding
-locking that the test suite does not exercise.
+I chose the conditional UPDATE over `SELECT ... FOR UPDATE` because SQLite does
+not support row-level locking, and the test suite must keep passing on SQLite.
+The conditional UPDATE is portable to Postgres unchanged.
+
+The earlier read-based stock check is deliberately kept. It is redundant for
+correctness, but it preserves the response-code ordering the spec requires (403
+for a restricted book must precede 409 for stock) and produces the clear error in
+the ordinary sequential case. The atomic UPDATE is the last line of defence, not
+the first.
 
 ### Loan status layering
 
