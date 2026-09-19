@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Member, MemberTier, Order
+from app.models import Loan, Member, MemberTier, Order, OrderStatus
 from app.schemas import MemberCreate, MemberStats
 
 # Tiers from lowest to highest; a member's rank is their index in this list.
@@ -80,4 +80,40 @@ def get_member_stats(db: Session, member_id: int, now: datetime) -> MemberStats:
     - overdue_loans counts unreturned loans with now > due_at.
     - late_fees_cents sums late fees of returned loans.
     """
-    raise NotImplementedError("get_member_stats")
+    get_member(db, member_id)
+
+    orders = db.scalars(
+        select(Order).where(
+            Order.member_id == member_id,
+            Order.status == OrderStatus.PAID.value,
+        )
+    ).all()
+
+    loans = db.scalars(
+        select(Loan).where(Loan.member_id == member_id)
+    ).all()
+
+    active_loans = sum(
+        loan.status_at(now) != "returned"
+        for loan in loans
+    )
+
+    overdue_loans = sum(
+        loan.status_at(now) == "overdue"
+        for loan in loans
+    )
+
+    late_fees_cents = sum(
+        loan.late_fee_cents
+        for loan in loans
+        if loan.returned_at is not None
+    )
+
+    return MemberStats(
+        member_id=member_id,
+        orders_paid=len(orders),
+        total_spent_cents=sum(order.total_cents for order in orders),
+        active_loans=active_loans,
+        overdue_loans=overdue_loans,
+        late_fees_cents=late_fees_cents,
+    )

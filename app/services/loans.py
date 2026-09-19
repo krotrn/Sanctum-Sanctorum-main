@@ -12,6 +12,7 @@ from app.schemas import LoanCreate, LoanOut, LoanStatus
 from app.services.books import get_book
 from app.services.members import ensure_can_access_restricted, get_member
 
+
 # Maximum concurrent unreturned loans per tier (None = unlimited).
 TIER_LOAN_LIMIT: Dict[str, Optional[int]] = {
     MemberTier.APPRENTICE.value: 1,
@@ -24,15 +25,6 @@ LOAN_PERIOD = timedelta(days=14)
 LATE_FEE_PER_DAY_CENTS = 25
 
 
-def loan_status(loan: Loan, now: datetime) -> LoanStatus:
-    """``returned`` if returned; else ``overdue`` if now > due_at; else ``active``."""
-    if loan.returned_at is not None:
-        return "returned"
-    if now > loan.due_at:
-        return "overdue"
-    return "active"
-
-
 def to_loan_out(loan: Loan, now: datetime) -> LoanOut:
     """Serialize a loan, computing its status at read time."""
     return LoanOut(
@@ -43,7 +35,7 @@ def to_loan_out(loan: Loan, now: datetime) -> LoanOut:
         due_at=loan.due_at,
         returned_at=loan.returned_at,
         late_fee_cents=loan.late_fee_cents,
-        status=loan_status(loan, now)
+        status=loan.status_at(now),
     )
 
 
@@ -88,13 +80,13 @@ def create_loan(db: Session, data: LoanCreate, now: datetime) -> LoanOut:
         select(Loan).where(Loan.member_id == member.id)
     ).all()
 
-    if any(loan_status(loan, now) == "overdue" for loan in member_loans):
+    if any(loan.status_at(now) == "overdue" for loan in member_loans):
         raise HTTPException(
             status_code=409,
             detail="Member has an overdue loan",
         )
     if any(
-        loan.book_id == book.id and loan_status(loan, now) != "returned"
+        loan.book_id == book.id and loan.status_at(now) != "returned"
         for loan in member_loans
     ):
         raise HTTPException(
@@ -104,7 +96,7 @@ def create_loan(db: Session, data: LoanCreate, now: datetime) -> LoanOut:
     limit = TIER_LOAN_LIMIT[member.tier]
 
     active_loans = sum(
-        loan_status(loan, now) != "returned"
+        loan.status_at(now) != "returned"
         for loan in member_loans
     )
 
