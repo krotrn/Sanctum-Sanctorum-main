@@ -84,3 +84,14 @@ sleep can take ~50 seconds. It is not down — please retry.
 
 All 202 tests pass (`uv run pytest`). Every endpoint in SPEC.md is implemented.
 
+## Issues found in the provided code
+
+`frontend/app.js` renders a Return button for every unreturned loan
+(`data-action="loan-return"`, line 1315) and defines `returnLoan()` (line 1324),
+but the click dispatcher's switch statement has no `case 'loan-return'`. The
+handler was therefore never invoked and the button silently did nothing, while
+`POST /loans/{id}/return` worked correctly via the API.
+
+I added the missing case. The frontend is otherwise unmodified.
+
+
