@@ -72,3 +72,15 @@ Antigravity initially suggested moving the shared `loan_status` function into a 
 Instead, I treated the circular import as a layering signal and moved the rule to `Loan.status_at(now)` in `app/models.py`. Loan status depends only on the loan state and an explicitly supplied timestamp, so it does not require a service or database. Keeping `now` as a parameter also preserves the `get_now` dependency rule and keeps the calculation deterministic and testable.
 
 I considered the alternative of using a deferred import inside the service, but rejected it because that would hide the dependency cycle rather than correct the layering.
+
+# Sanctum Sanctorum — Notes
+
+**Live:** https://sanctum-sanctorum-main.onrender.com
+
+Render's free tier sleeps after ~15 minutes idle; the first request after a
+sleep can take ~50 seconds. It is not down — please retry.
+
+## Status
+
+All 202 tests pass (`uv run pytest`). Every endpoint in SPEC.md is implemented.
+
