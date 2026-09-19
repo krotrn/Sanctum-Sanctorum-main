@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict
 
 from fastapi import HTTPException
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models import Book, Member, MemberTier, Order, OrderItem, OrderStatus
@@ -28,6 +29,28 @@ def calculate_discount_percent(member: Member, total_quantity: int) -> int:
     tier_discount = TIER_DISCOUNT_PERCENT[member.tier]
     bulk_discount = BULK_DISCOUNT_PERCENT if total_quantity >= BULK_QUANTITY_THRESHOLD else 0
     return tier_discount + bulk_discount
+
+
+def reserve_stock(db: Session, book: Book, quantity: int) -> None:
+    """Decrement a book's stock atomically, or raise 409 if it is no longer available.
+
+    The ``stock >= quantity`` guard lives in the UPDATE itself, so the database
+    evaluates it while holding the row's write lock. Two concurrent orders for the
+    last copy therefore cannot both succeed: the loser matches no rows and is
+    rejected here, after the caller's earlier read-based check has already passed.
+    """
+    result = db.execute(
+        update(Book)
+        .where(Book.id == book.id, Book.stock >= quantity)
+        .values(stock=Book.stock - quantity)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Insufficient stock for book {book.id} ({book.title})",
+        )
 
 
 def create_order(db: Session, data: OrderCreate, now: datetime) -> Order:
@@ -70,7 +93,7 @@ def create_order(db: Session, data: OrderCreate, now: datetime) -> Order:
         book = books[item.book_id]
         unit_price_cents = book.price_cents
         line_total_cents = unit_price_cents * item.quantity
-        book.stock -= item.quantity
+        reserve_stock(db, book, item.quantity)
 
         order.items.append(
             OrderItem(
