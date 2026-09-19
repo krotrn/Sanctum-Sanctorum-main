@@ -9,3 +9,16 @@ This SELECT is subject to a TOCTOU (time-of-check/time-of-use) race under
 concurrent requests. The database UNIQUE constraint remains the actual
 correctness guarantee. The explicit SELECT is primarily responsible for
 providing the expected 409 response during the normal duplicate case.
+
+## Duplicate member email handling
+
+Member emails are normalized by stripping whitespace and lowercasing before
+validation and storage. Duplicate detection therefore uses plain equality
+against the normalized email.
+
+No `func.lower()` is used because every stored email is already lowercase.
+This also keeps the email index directly usable.
+
+An explicit SELECT is used to return HTTP 409 for the normal duplicate case.
+The database uniqueness constraint remains the final guarantee under concurrent
+requests.
