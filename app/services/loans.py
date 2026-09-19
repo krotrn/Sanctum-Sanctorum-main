@@ -21,7 +21,11 @@ LATE_FEE_PER_DAY_CENTS = 25
 
 def loan_status(loan: Loan, now: datetime) -> LoanStatus:
     """``returned`` if returned; else ``overdue`` if now > due_at; else ``active``."""
-    raise NotImplementedError("loan_status")
+    if loan.returned_at is not None:
+        return LoanStatus.RETURNED
+    if now > loan.due_at:
+        return LoanStatus.OVERDUE
+    return LoanStatus.ACTIVE
 
 
 def to_loan_out(loan: Loan, now: datetime) -> LoanOut:
