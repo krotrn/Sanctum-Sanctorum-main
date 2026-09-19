@@ -22,3 +22,20 @@ This also keeps the email index directly usable.
 An explicit SELECT is used to return HTTP 409 for the normal duplicate case.
 The database uniqueness constraint remains the final guarantee under concurrent
 requests.
+
+
+## Order stock concurrency
+
+The current validate-then-mutate flow is safe for normal sequential requests, but it is not fully concurrency-safe. Two simultaneous orders can both read the same available stock before either transaction commits, allowing both to reserve the same copies.
+
+A production implementation should make the stock decrement atomic, for example:
+
+```sql
+UPDATE books
+SET stock = stock - :q
+WHERE id = :id AND stock >= :q
+```
+
+and verify that exactly one row was updated, or use `SELECT ... FOR UPDATE` to lock the book row during validation and mutation.
+
+The current implementation prioritises readable all-or-nothing semantics — validation completes before any mutation, so the integrity guarantee is visible in the structure of the function rather than implied by the transaction.
