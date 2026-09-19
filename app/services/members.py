@@ -3,11 +3,11 @@ from datetime import datetime
 from typing import List
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Loan, Member, MemberTier, Order, OrderStatus
-from app.schemas import MemberCreate, MemberStats
+from app.schemas import MemberCreate, MemberPage, MemberStats
 
 # Tiers from lowest to highest; a member's rank is their index in this list.
 TIER_ORDER: List[str] = [
@@ -62,6 +62,18 @@ def get_member(db: Session, member_id: int) -> Member:
     if member is None:
         raise HTTPException(status_code=404, detail="Member not found")
     return member
+
+
+def list_members(db: Session, limit: int = 20, offset: int = 0) -> MemberPage:
+    """A page of members ordered by id ascending.
+
+    ``total`` counts every member, before ``limit``/``offset`` are applied, so a
+    caller can tell how many pages remain.
+    """
+    query = select(Member)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    members = db.scalars(query.order_by(Member.id.asc()).limit(limit).offset(offset)).all()
+    return MemberPage(items=members, total=total, limit=limit, offset=offset)
 
 
 def list_member_orders(db: Session, member_id: int) -> List[Order]:
